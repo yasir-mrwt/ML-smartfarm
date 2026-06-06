@@ -1,0 +1,9 @@
+export function backendFallback(sensorData, reason="ML model unavailable"){
+  const t = Number(sensorData.temperature), h = Number(sensorData.humidity), air = Number(sensorData.airQualityRaw || 0), gas = Number(sensorData.gasLevel || air);
+  let fan=false, heater=false, ventilation=false, emergency=false, riskType="Safe", riskLevel="Safe", score=5, recommendation="Environment appears safe based on backend fallback rules.";
+  if (gas >= 700 || air >= 850){ fan=true; ventilation=true; emergency=true; riskType="Critical Air/Gas Emergency"; riskLevel="Critical"; score=96; recommendation="Dangerous air/gas detected. Ventilate immediately and inspect manually."; }
+  else if (t >= 35){ fan=true; ventilation=true; riskType="Heat Risk"; riskLevel=t>=42?"Critical":"High"; emergency=t>=42; score=t>=42?92:75; recommendation="Temperature is high. Turn fan ON and monitor."; }
+  else if (t <= 18){ heater=true; riskType="Cold Risk"; riskLevel=t<=5?"Critical":"High"; emergency=t<=5; score=t<=5?91:70; recommendation="Temperature is low. Turn heater ON."; }
+  else if (h >= 85){ ventilation=true; riskType="High Humidity Risk"; riskLevel="Medium"; score=50; recommendation="Humidity is high. Improve ventilation."; }
+  return { status:"backend_fallback", risk_type:riskType, risk_level:riskLevel, risk_score:score, confidence:null, recommendation, fan_status:fan?"ON":"OFF", heater_status:heater?"ON":"OFF", ventilation_alert:ventilation?"ON":"OFF", emergency_alert:emergency?"ON":"OFF", automation_allowed:true, safe_mode:true, warnings:[reason], errors:[], alert: emergency?"Emergency fallback activated":"Backend fallback used", ui:{ color: emergency?"red":riskLevel==="Safe"?"green":"orange", priority: emergency?5:riskLevel==="Safe"?1:4, icon: emergency?"emergency":"warning" }, manual_inspection_required: emergency, confidence_reason:"Backend fallback used.", automation:{} };
+}
