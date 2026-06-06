@@ -1,153 +1,149 @@
-# ML Smart Farm
+# ML Smart Farm Dashboard
 
-Full-stack smart-farm dashboard connecting an ESP32, Firebase Realtime
-Database, a Node.js decision backend, Open-Meteo weather, and the hosted
-Hugging Face ML model.
+A local full-stack smart-farm monitoring and automation system built with an
+ESP32, Firebase Realtime Database, Node.js, React, weather data, and an ML
+prediction service.
 
-## Hosting
-
-The project is structured as one GitHub monorepo with separate deployments:
-
-```text
-frontend/ -> Netlify
-backend/  -> Render
-```
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for the complete GitHub push, Render,
-Netlify, environment-variable, CORS, testing, and future-update workflow.
+This repository is configured for local development. It does not include cloud
+deployment configuration.
 
 ## System Flow
 
 ```text
 ESP32
   -> writes sensor readings to Firebase
-Firebase Realtime Database
-  -> streams live farm data to React
-  -> notifies the Node backend about new sensor readings
-Node backend
-  -> fetches UET Peshawar outdoor weather
-  -> maps sensor and weather values to the ML request
-  -> calls the Hugging Face /predict endpoint
-  -> writes prediction, commands, alerts, and history to Firebase
-ESP32
-  -> reads commands and controls fan, heater, ventilation, and emergency output
-React dashboard
-  -> displays all live values and can apply a manual override
-```
 
-The backend remains the automatic decision maker. The frontend writes only
-explicit manual commands and asks the backend to process a reading.
+Firebase Realtime Database
+  -> streams live data to the React dashboard
+  -> provides sensor data to the Node.js backend
+
+Node.js backend
+  -> reads the latest sensor values
+  -> fetches outdoor weather
+  -> sends the mapped payload to the ML service
+  -> applies fallback safety rules when required
+  -> writes predictions, commands, alerts, and history to Firebase
+
+ESP32
+  -> reads Firebase commands
+  -> controls fan, heater, ventilation, and emergency outputs
+```
 
 ## Project Structure
 
 ```text
-backend/
-  serviceAccountKey.json       Firebase Admin credential (you add this)
-  src/
-    index.js                   Express and realtime processor startup
-    routes/deviceRoutes.js     Latest data, process, and command endpoints
-    services/firebase.js       Firebase Admin connection
-    services/weather.js        Open-Meteo UET Peshawar weather
-    services/mlClient.js       Hosted ML API client
-    services/mapper.js         Firebase-to-model and model-to-command mapping
-    services/fallback.js       Backend safety rules
-    services/processor.js      Complete processing pipeline
-
-frontend/
-  src/
-    App.jsx                    Single-page live SaaS dashboard
-    services/firebase.js       Firebase Web SDK configuration
-    services/firebaseData.js   Realtime listener and manual command writes
-    services/api.js            Process Now backend request
-    styles/global.css          Responsive light/dark dashboard theme
+ML-smartfarm/
+|-- backend/
+|   |-- serviceAccountKey.json
+|   |-- .env
+|   |-- package.json
+|   |-- scripts/
+|   `-- src/
+|       |-- index.js
+|       |-- routes/
+|       `-- services/
+|-- frontend/
+|   |-- .env
+|   |-- package.json
+|   `-- src/
+|       |-- App.jsx
+|       |-- services/
+|       `-- styles/
+|-- ESP32_COMMAND_FLOW.md
+|-- README.md
+`-- .gitignore
 ```
 
-## Environment Configuration
+## Private Files
 
-The project uses real environment files:
+These files contain local configuration or credentials and must not be
+committed:
 
 ```text
 backend/.env
 frontend/.env
+backend/serviceAccountKey.json
 ```
 
-Both files, plus `backend/serviceAccountKey.json`, are excluded by
-`.gitignore`. Do not force-add or commit them.
+They are excluded by `.gitignore`.
 
-The backend env contains server-only settings:
+## Backend Environment
+
+Create `backend/.env` using your own private values:
 
 ```env
-PORT=5000
-FRONTEND_ORIGIN=http://localhost:5173
-FIREBASE_DATABASE_URL=https://ai-smart-farm-5e26c-default-rtdb.asia-southeast1.firebasedatabase.app
+PORT=<LOCAL_BACKEND_PORT>
+FRONTEND_ORIGIN=<LOCAL_FRONTEND_ORIGIN>
+
+FIREBASE_DATABASE_URL=<YOUR_FIREBASE_DATABASE_URL>
 FIREBASE_SERVICE_ACCOUNT_PATH=./serviceAccountKey.json
-ML_API_URL=https://Yasir-mrwt-smart-farm-ml-api.hf.space
-ML_TIMEOUT_MS=30000
-FARM_LATITUDE=34.0016
-FARM_LONGITUDE=71.4859
-WEATHER_REFRESH_MINUTES=10
-DEFAULT_DEVICE_ID=smartFarm001
-PROCESS_COOLDOWN_MS=5000
+
+ML_API_URL=<YOUR_ML_API_URL>
+ML_TIMEOUT_MS=<TIMEOUT_IN_MILLISECONDS>
+
+FARM_LATITUDE=<YOUR_FARM_LATITUDE>
+FARM_LONGITUDE=<YOUR_FARM_LONGITUDE>
+WEATHER_REFRESH_MINUTES=<REFRESH_INTERVAL>
+
+DEFAULT_DEVICE_ID=<YOUR_DEVICE_ID>
+PROCESS_COOLDOWN_MS=<PROCESSING_COOLDOWN>
 ```
 
-The frontend env contains Vite client settings:
+Do not place the Firebase Admin private key directly inside the env file.
+Keep it in `backend/serviceAccountKey.json`.
+
+## Frontend Environment
+
+Create `frontend/.env` using your Firebase Web configuration:
 
 ```env
-VITE_API_BASE_URL=http://localhost:5000
-VITE_DEVICE_ID=smartFarm001
-VITE_FARM_LATITUDE=34.0016
-VITE_FARM_LONGITUDE=71.4859
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_DATABASE_URL=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
+VITE_API_BASE_URL=<LOCAL_BACKEND_API_URL>
+VITE_DEVICE_ID=<YOUR_DEVICE_ID>
+
+VITE_FARM_LATITUDE=<YOUR_FARM_LATITUDE>
+VITE_FARM_LONGITUDE=<YOUR_FARM_LONGITUDE>
+
+VITE_FIREBASE_API_KEY=<YOUR_FIREBASE_WEB_API_KEY>
+VITE_FIREBASE_AUTH_DOMAIN=<YOUR_FIREBASE_AUTH_DOMAIN>
+VITE_FIREBASE_DATABASE_URL=<YOUR_FIREBASE_DATABASE_URL>
+VITE_FIREBASE_PROJECT_ID=<YOUR_FIREBASE_PROJECT_ID>
+VITE_FIREBASE_STORAGE_BUCKET=<YOUR_FIREBASE_STORAGE_BUCKET>
+VITE_FIREBASE_MESSAGING_SENDER_ID=<YOUR_SENDER_ID>
+VITE_FIREBASE_APP_ID=<YOUR_FIREBASE_APP_ID>
 ```
 
-Important: `.env` prevents accidental Git exposure, but every `VITE_*` value
-is bundled into browser JavaScript. Firebase Web configuration is designed to
-be public and must be protected with Realtime Database security rules. The
-Firebase Admin private key is the actual secret and remains backend-only.
+Values beginning with `VITE_` are included in browser JavaScript. Never place a
+Firebase Admin private key or service-account JSON in the frontend.
 
-The configured coordinates are approximate for UET Peshawar.
+## Firebase Admin Setup
 
-## Firebase Setup
+1. Open your Firebase project.
+2. Enable Realtime Database.
+3. Generate a Firebase Admin service-account key.
+4. Rename the downloaded file to:
 
-1. Open Firebase Console.
-2. Select project `ai-smart-farm-5e26c`.
-3. Go to **Project Settings > Service Accounts**.
-4. Select **Generate new private key**.
-5. Place the downloaded file at:
+```text
+serviceAccountKey.json
+```
+
+5. Place it inside:
 
 ```text
 backend/serviceAccountKey.json
 ```
 
-Do not move this file into `frontend`, commit it, or expose its contents in
-browser code. It is already excluded by `.gitignore`.
-
-The supplied service account has already been installed at this path for the
-current workspace.
-
-Realtime Database security rules must allow the dashboard to read the selected
-device and write its `commands` node. Use authenticated production rules for a
-deployed system. The backend uses Firebase Admin and is not limited by client
-rules.
-
-## Firebase Data Paths
+## Firebase Paths
 
 ```text
-/devices/smartFarm001/sensorData
-/devices/smartFarm001/weather
-/devices/smartFarm001/mlPrediction
-/devices/smartFarm001/commands
-/devices/smartFarm001/alerts
-/devices/smartFarm001/history
+/devices/<device-id>/sensorData
+/devices/<device-id>/weather
+/devices/<device-id>/mlPrediction
+/devices/<device-id>/commands
+/devices/<device-id>/alerts
+/devices/<device-id>/history
 ```
 
-The ESP32 writes sensor values in this shape:
+## Sensor Data Format
 
 ```json
 {
@@ -164,10 +160,10 @@ The ESP32 writes sensor values in this shape:
 }
 ```
 
-`airQualityRaw` is sent to the model as both `air_quality` and `gas_level` when
-the ESP32 does not provide a separate `gasLevel`.
+If a separate gas sensor value is unavailable, `airQualityRaw` is also used as
+the estimated gas-level input.
 
-## Install and Run
+## Installation
 
 Install backend dependencies:
 
@@ -183,7 +179,9 @@ cd frontend
 npm install
 ```
 
-Start the backend in one terminal:
+## Run Locally
+
+Start the backend:
 
 ```bash
 cd backend
@@ -197,219 +195,106 @@ cd frontend
 npm run dev
 ```
 
-Open:
+Open the local frontend URL printed by Vite.
 
-```text
-http://localhost:5173
-```
+## Testing
 
-Backend health endpoint:
-
-```text
-http://localhost:5000/api/health
-```
-
-Hosted ML health endpoint:
-
-```text
-https://Yasir-mrwt-smart-farm-ml-api.hf.space/health
-```
-
-## Test Every Layer
-
-Run these commands from separate terminals as needed.
-
-### 1. Firebase Admin
-
-Tests the service account plus backend write, read, and cleanup:
+Firebase Admin connection:
 
 ```bash
 cd backend
 npm run test:firebase
 ```
 
-Expected:
-
-```text
-PASS Firebase Admin connection, write, read, and cleanup
-```
-
-### 2. Outdoor Weather
-
-Tests Open-Meteo using the latitude and longitude from `backend/.env`:
+Weather service:
 
 ```bash
 cd backend
 npm run test:weather
 ```
 
-Expected: a PASS line with current outdoor temperature and wind speed.
-
-### 3. Hosted ML Model
-
-Sends a safe synthetic sensor payload to the configured `/predict` endpoint:
+ML prediction service:
 
 ```bash
 cd backend
 npm run test:ml
 ```
 
-Expected: a PASS line containing model status and risk score.
-
-### 4. Complete Backend Pipeline
-
-Creates a temporary Firebase test device, processes weather and ML, verifies
-all output paths, and deletes the test device. It never writes commands to
-`smartFarm001`.
+Complete isolated backend pipeline:
 
 ```bash
 cd backend
 npm run test:integration
 ```
 
-Expected:
-
-```text
-PASS full pipeline on isolated test device (...)
-```
-
-### 5. Firebase Web Client and Rules
-
-Tests that the frontend Firebase SDK can read production sensor data and write
-an isolated test-device command. It does not control the real ESP32.
+Firebase Web SDK permissions:
 
 ```bash
 cd frontend
 npm run test:firebase
 ```
 
-If this reports `PERMISSION_DENIED`, update Realtime Database rules or add
-Firebase Authentication before the live dashboard can work.
-
-### 6. Frontend Build
+Frontend production build:
 
 ```bash
 cd frontend
 npm run build
 ```
 
-Expected: `built` with no compilation errors. A bundle-size warning is
-informational.
-
-### 7. Backend HTTP API
-
-Start the backend:
-
-```bash
-cd backend
-npm run dev
-```
-
-Open:
+## Backend API
 
 ```text
-http://localhost:5000/api/health
+GET  <BACKEND_API_BASE_URL>/api/health
+GET  <BACKEND_API_BASE_URL>/api/devices/<device-id>/latest
+POST <BACKEND_API_BASE_URL>/api/devices/<device-id>/process
+POST <BACKEND_API_BASE_URL>/api/devices/<device-id>/command
 ```
 
-Then test the latest-data route:
+Use an isolated test device before processing a real hardware device.
 
-```text
-http://localhost:5000/api/devices/smartFarm001/latest
-```
+## Manual Controls
 
-To process the current production reading intentionally:
+The dashboard supports:
 
-```powershell
-Invoke-RestMethod -Method Post `
-  -Uri http://localhost:5000/api/devices/smartFarm001/process
-```
+- Fan ON and OFF
+- Heater or light ON and OFF
+- Ventilation ON and OFF
+- Emergency output ON and OFF
+- Resume ML Automation
+- Process Now
 
-This final command can update real ESP32 commands. Use the isolated integration
-test first.
-
-### 8. Live Dashboard
-
-With the backend running, start:
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open `http://localhost:5173` and verify:
-
-1. The header says `Firebase live`.
-2. Sensor cards match `/devices/smartFarm001/sensorData`.
-3. Weather, AI response, command status, and charts populate.
-4. **Process Now** updates weather, prediction, and history.
-5. **Fan ON** writes `fan: true`, `manualOverride: true`.
-6. **Fan OFF** writes `fan: false`, `manualOverride: true`.
-7. **Resume ML Automation** clears manual override and processes a new result.
-
-Fan button tests control the real Firebase command path and may operate
-connected hardware. Confirm relay wiring and local safety rules first.
-
-## Backend Processing
-
-Automatic processing listens to:
-
-```text
-/devices/smartFarm001/sensorData
-```
-
-It processes at most once every five seconds. A manual run is also available:
-
-```http
-POST /api/devices/smartFarm001/process
-```
-
-Each run:
-
-1. Reads the latest sensor data.
-2. Fetches UET Peshawar weather from Open-Meteo.
-3. Builds the complete ML payload.
-4. Calls the hosted `/predict` endpoint.
-5. Uses backend fallback rules if the model request fails.
-6. Writes `weather` and `mlPrediction`.
-7. Writes automatic `commands` unless manual override is active.
-8. Adds a `history` record.
-9. Adds an alert for critical predictions.
-
-## Manual Fan Control
-
-The dashboard provides separate **Fan ON** and **Fan OFF** buttons. Selecting
-either button writes a command like:
+Manual commands write:
 
 ```json
 {
-  "fan": true,
-  "heater": false,
   "automationAllowed": false,
   "manualOverride": true,
   "source": "manual_dashboard",
-  "reason": "Fan manually switched ON from dashboard",
   "updatedAt": 1710000000000
 }
 ```
 
-While manual override is active, backend processing continues to update
-weather, predictions, alerts, and history but does not replace the manual
-command. Select **Resume ML Automation** to clear manual override and
-immediately process the latest reading.
+Ventilation uses the physical fan relay. Enabling ventilation also sets:
 
-Heater, ventilation, and emergency outputs also have manual controls.
-Ventilation uses the physical fan relay, so enabling ventilation also writes
-`fan: true` and `heater: false`. Disabling ventilation writes `fan: false`.
-
-## ESP32 Command Reading
-
-The ESP32 must listen to:
-
-```text
-/devices/smartFarm001/commands
+```json
+{
+  "ventilation": true,
+  "fan": true,
+  "heater": false
+}
 ```
 
-Automatic command example:
+Disabling ventilation sets both `ventilation` and `fan` to `false`.
+
+## ESP32 Commands
+
+The ESP32 listens to:
+
+```text
+/devices/<device-id>/commands
+```
+
+Example:
 
 ```json
 {
@@ -418,52 +303,50 @@ Automatic command example:
   "ventilation": true,
   "emergency": false,
   "automationAllowed": true,
+  "manualOverride": false,
   "safeMode": false,
   "source": "ml_model",
-  "reason": "Turn fan ON and monitor temperature.",
-  "riskType": "Heat Risk",
-  "riskLevel": "High",
-  "riskScore": 75,
+  "reason": "Example recommendation",
   "updatedAt": 1710000000000
 }
 ```
 
-The firmware should map `fan`, `heater`, `ventilation`, and `emergency` to the
-appropriate relays, buzzer, or LED. It should also report physical output state
-as `fanState` and `heaterState` in `sensorData`.
-
 ## Safety Fallback
 
-If the ML API is unavailable, backend rules still issue a command:
-
 ```text
-gasLevel >= 700 or airQualityRaw >= 850:
-  fan ON, ventilation ON, emergency ON, heater OFF
-
-temperature >= 35 C:
-  fan ON, ventilation ON, heater OFF
-
-temperature <= 18 C:
-  heater ON, fan OFF
-
-humidity >= 85%:
+High gas or air-quality reading:
+  fan ON
   ventilation ON
+  emergency ON
+  heater OFF
+
+High temperature:
+  fan ON
+  ventilation ON
+  heater OFF
+
+Low temperature:
+  heater ON
+  fan OFF
+
+High humidity:
+  ventilation ON
+  fan ON
 ```
 
-The fallback prediction is marked `backend_fallback` and `safe_mode: true`.
-The ESP32 must keep its own local fallback rules as the final protection layer
-when Firebase or the backend cannot be reached.
+The ESP32 must keep local fallback rules in case Firebase, networking, the
+backend, or the ML service becomes unavailable.
 
-## Dashboard Features
+## Security
 
-- Live Firebase sensor, weather, prediction, command, alert, and history data
-- Indoor and outdoor temperature
-- Humidity, pressure, raw air quality, voltage, and estimated gas
-- Risk score, confidence, recommendation, warnings, and errors
-- Temperature, humidity, air/gas, and risk charts
-- Device RSSI, uptime, mode, fan feedback, and heater feedback
-- Separate manual Fan ON and Fan OFF actions
-- Heater, ventilation, emergency, and automation controls
-- Process Now backend action
-- Responsive single-page layout without a sidebar
-- Persistent light and dark themes
+- Keep env files private.
+- Keep Firebase Admin credentials backend-only.
+- Use Firebase security rules.
+- Add authentication before exposing manual controls publicly.
+- Never commit private keys or tokens.
+- Test relay wiring before controlling physical hardware.
+
+## Disclaimer
+
+This software can control physical electrical equipment. Use relay protection,
+manual shutoff controls, safe wiring, and independent local safety rules.

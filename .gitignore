@@ -5,5 +5,3 @@ backend/serviceAccountKey.json
 .env
 .env.*
 *.log
-.netlify/
-.render/

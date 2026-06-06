@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "secret:base64": "node scripts/serviceAccountToBase64.js",
     "test:firebase": "node scripts/testFirebase.js",
     "test:weather": "node scripts/testWeather.js",
     "test:ml": "node scripts/testMl.js",

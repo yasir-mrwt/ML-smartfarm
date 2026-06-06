@@ -10,29 +10,19 @@ import { startRealtimeProcessor } from "./services/processor.js";
 
 const app = express();
 const server = http.createServer(app);
-const allowedOrigins = process.env.FRONTEND_ORIGIN?.split(",")
-  .map((origin) => origin.trim().replace(/\/$/, ""))
-  .filter(Boolean);
+const allowedOrigin = process.env.FRONTEND_ORIGIN;
 const mlApi = process.env.ML_API_URL;
 
-if (!allowedOrigins?.length || !mlApi) {
+if (!allowedOrigin || !mlApi) {
   throw new Error("Missing FRONTEND_ORIGIN or ML_API_URL in backend/.env");
 }
 
-const corsOrigin = (origin, callback) => {
-  if (!origin || allowedOrigins.includes(origin.replace(/\/$/, ""))) {
-    callback(null, true);
-    return;
-  }
-  callback(new Error(`Origin not allowed by CORS: ${origin}`));
-};
-
-app.use(cors({ origin: corsOrigin, credentials: true }));
+app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
 
 const io = new Server(server, {
-  cors: { origin: corsOrigin, methods: ["GET", "POST"] },
+  cors: { origin: allowedOrigin, methods: ["GET", "POST"] },
 });
 
 app.get("/", (req, res) => res.json({ service: "Smart Farm AI Backend", status: "running" }));
@@ -51,6 +41,6 @@ startRealtimeProcessor(io);
 
 const PORT = process.env.PORT;
 if (!PORT) throw new Error("Missing PORT in backend/.env");
-server.listen(PORT, "0.0.0.0", () =>
-  console.log(`Smart Farm backend running on 0.0.0.0:${PORT}`),
+server.listen(PORT, () =>
+  console.log(`Smart Farm backend running on port ${PORT}`),
 );
